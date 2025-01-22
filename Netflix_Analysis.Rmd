@@ -1,0 +1,468 @@
+---
+title: "Netflix Dataset Analysis"
+author: "Prasanna Jaganadham"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    theme: cosmo
+    self_contained: true
+    code_folding: hide
+    css: styles.css
+---
+```{r setup_and_cleaning, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+getwd()
+
+#Set directory
+setwd("C:/Users/Ayomide/Documents/BSB/GGPLOT & Rmarkdown/Directory for GGPLOT & R.Markdown/Two_Main_Project")
+
+```
+
+#  {.tabset}
+
+![](https://screenshots.codesandbox.io/vtqcjt/0.png)
+
+
+## <span style="color: rgb(221,72,20);">Introduction</span>
+
+ **Introduction**
+
+Netflix has revolutionized the entertainment industry, providing a diverse library of movies and TV shows for audiences worldwide. In this project, we analyze the Netflix dataset to explore trends, patterns, and insights related to content distribution, production years, and global reach.
+
+#### <span style="color:brown;">**The Dataset inculdes information on**:</span>
+
+- Content type (Movies or TV Shows)
+- Title, genre, and director
+- Country of origin
+- Release year and date added to Netflix
+- Duration and rating
+
+#### <span style="color:brown;">**Our analysis will focus on**:</span>
+
+1. Cleaning and preprocessing the data.
+2. Exploring key trends in Netflix's content library.
+3. Visualizing insights using graphs and charts.
+4. Drawing meaningful conclusions for stakeholders.
+
+---
+
+
+## <span style="color: rgb(221,72,20);">Data Life Cycle</span>
+
+
+```{r load_and_cleaning,  echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
+# Load the Required Libraries
+library(dplyr)    
+library(ggplot2)   
+library(tidyr)     
+library(lubridate) 
+library(knitr)     
+library(kableExtra) 
+library(stringr)
+library(RColorBrewer)
+
+# Check for loaded libraries
+search()
+
+# Load the dataset
+netflix_data <- read.csv("netflix_titles.csv", stringsAsFactors = FALSE)
+
+# Trim whitespace from column names
+colnames(netflix_data) <- str_trim(colnames(netflix_data))
+colnames(netflix_data) <- str_replace_all(colnames(netflix_data), " ", "_")
+
+# Trim whitespace in all character columns
+netflix_data <- netflix_data %>%
+  mutate(across(where(is.character), str_trim))
+
+# Convert 'release_year' to numeric
+netflix_data$release_year <- as.numeric(netflix_data$release_year)
+
+# Clean and convert 'date_added' column
+netflix_data$date_added <- str_trim(netflix_data$date_added)
+netflix_data$date_added <- parse_date_time(netflix_data$date_added, orders = c("d-b-Y", "Y-m-d", "m/d/Y"))
+
+# Extract numeric values and types from the 'duration' column
+netflix_data <- netflix_data %>%
+  mutate(
+    duration_value = as.numeric(str_extract(duration, "\\d+")),
+    duration_type = ifelse(str_detect(duration, "Season"), "Season", "Minute")
+  )
+
+# Replace empty strings in all character columns with NA
+netflix_data <- netflix_data %>%
+  mutate(across(where(is.character), ~ na_if(.x, "")))
+
+# Select relevant columns for analysis
+netflix_data <- netflix_data %>%
+  select(
+    show_id, type, title, director, cast, country, date_added,
+    release_year, rating, duration_value, duration_type, listed_in, description
+  )
+
+# Preview the cleaned dataset
+head(netflix_data)
+summary(netflix_data)
+
+# Saved cleaned dataset
+write.csv(netflix_data, "cleaned_netflix_data.csv", row.names = FALSE)
+
+```
+
+
+**<span style="color:Brown;">Data Collection:</span>**
+
+**Source**: Netflix dataset containing information about movies and TV shows, such as type, title, director, country, release year, and ratings.
+
+**Data Cleaning and Pre-Processing:**
+ 
+ + Removed unnecessary whitespaces and converted columns like date_added and release_year to appropriate formats.
+ 
+ + Extracted duration values and types into separate columns (duration_value, duration_type).
+ 
+ + Replaced empty strings in text fields with NA.
+ 
+ + Selected relevant columns for analysis.
+
+**Data Transformation:**
+
+ + Filtered, grouped, and aggregated data to create meaningful insights, such as content distribution by type, country, and           category.
+ 
+ + Expanded multi-value fields (e.g., listed_in) into separate rows for better analysis of categories and genres.
+ 
+**Data Analysis and Visualization:**
+
+ + Performed statistical summaries and visualizations, including bar charts, scatter plots, line graphs, and heatmaps to uncover    patterns and trends.
+ 
+ + Key focus areas: content type distribution, top countries in production, content added over time, and rating trends
+
+
+
+## <span style="color: rgb(221,72,20);">Visualizations</span> {.tabset}
+
+### **Content Analysis** 
+
+
+
+
+
+
+```{r top_10_categories_plot, echo=FALSE, warning=FALSE, message=FALSE}
+
+# Expand 'listed_in' column into multiple rows
+categories <- netflix_data %>%
+  select(listed_in) %>%
+  separate_rows(listed_in, sep = ", ") %>%
+  group_by(listed_in) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+
+ggplot(categories[1:10, ], aes(x = reorder(listed_in, Count), y = Count, fill = listed_in)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(
+    title = "Top 10 Content Categories",
+    caption = "\"The International Movies\" and \"Dramas\" are the most prominent categories,\nreflecting a global and diverse audience.",
+    x = "Category",
+    y = "Count"
+  ) +
+  scale_fill_brewer(palette = "RdBu") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5, margin = margin(b = 10)),
+    plot.caption = element_text(size = 10, face = "italic", hjust = 0.5, margin = margin(t = 20)),
+    axis.text.y = element_text(size = 9),
+    axis.text.x = element_text(size = 10),
+    legend.position = "right", 
+    legend.title = element_text(size = 9, face = "bold"),
+    legend.text = element_text(size = 10),
+    plot.margin = margin(20, 20, 30, 20) 
+  )
+
+```
+
+
+```{r top_10_countries_plot, echo=FALSE, warning=FALSE, message=FALSE}
+# Count of content per country
+top_countries <- netflix_data %>%
+  filter(!is.na(country)) %>%
+  separate_rows(country, sep = ", ") %>%
+  group_by(country) %>%
+  summarise(Content_Count = n()) %>%
+  arrange(desc(Content_Count)) %>%
+  head(10)
+
+# Plot
+ggplot(top_countries, aes(x = reorder(country, Content_Count), y = Content_Count, fill = country)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  coord_flip() +
+  labs(
+    title = "Top 10 Countries by Content Production",
+    subtitle = "The United States dominates in content production, followed by India and the United Kingdom.",
+    x = "Country",
+    y = "Content Count"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 9, face = "italic", hjust = 0.5, margin = margin(t = 10, b = 20)),
+    axis.text.y = element_text(size = 9),
+    axis.text.x = element_text(size = 10),
+    plot.margin = margin(20, 20, 40, 20) 
+  ) +
+  guides(fill = guide_legend(title = NULL)) 
+
+```
+
+
+
+
+
+
+```{r top_countries_content_count, echo=FALSE, warning=FALSE, message=FALSE}
+# Ensure the 'rating' column is clean and ordered
+valid_ratings <- c("G", "PG", "PG-13", "R", "NC-17", "TV-Y", "TV-Y7", 
+                   "TV-G", "TV-PG", "TV-14", "TV-MA")
+cleaned_data <- netflix_data %>%
+  filter(rating %in% valid_ratings) %>%
+  mutate(rating = factor(rating, levels = valid_ratings))  
+
+# Create the bar chart with counts on top
+ggplot(top_countries, aes(x = reorder(country, Content_Count), y = Content_Count)) +
+  geom_point(
+    aes(color = country),       
+    size = 4                     
+  ) +
+  geom_text(
+    aes(label = Content_Count),  
+    vjust = 0.5,                 
+    hjust = -0.2,                
+    size = 3                    
+  ) +
+  coord_flip() +                
+  labs(
+    title = "Top 10 Countries by Content Production",
+    subtitle = "TV-MA has the highest count for both movies and TV shows, reflecting content targeting mature audiences.",
+    x = "Country",
+    y = "Content Count"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",    # Remove legend for cleaner presentation
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 9, face = "italic", hjust = 0.5, margin = margin(t = 5, b = 10)),
+    axis.text.y = element_text(size = 9),
+    axis.text.x = element_text(size = 10),
+    plot.margin = margin(20, 20, 20, 20)
+  )
+
+```
+
+
+
+```{r content_type_distribution_plot, echo=FALSE, warning=FALSE, message=FALSE}
+# Calculate percentage for each content type
+content_distribution <- netflix_data %>%
+  group_by(type) %>%
+  summarise(Count = n()) %>%
+  mutate(Percentage = Count / sum(Count) * 100) # Calculate percentage
+
+# Bar plot with percentage labels
+ggplot(content_distribution, aes(x = reorder(type, Count), y = Count, fill = type)) +
+  geom_segment(aes(x = type, xend = type, y = 0, yend = Count), size = 1.5, color = "grey") + 
+  geom_point(size = 6, aes(color = type)) +   # Lollipop heads
+  geom_text(
+    aes(label = paste0(round(Percentage, 1), "%")), 
+    vjust = 1.5,  # Position the text below the lollipop heads
+    hjust = -0.1, 
+    size = 5      
+  ) +
+  labs(
+    title = "Netflix Movies vs TV Shows",
+    subtitle = "This lollipop chart clearly shows that Netflix has more movies compared to TV shows.",
+    x = "Content Type",
+    y = "Count"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 10, face = "italic", hjust = 0.5, margin = margin(t = 5, b = 10)),
+    axis.text.y = element_text(size = 9),
+    axis.text.x = element_text(size = 9),
+    plot.margin = margin(20, 20, 40, 20), 
+    legend.position = "none"  
+  )
+
+
+```
+
+### **Netflix Content Trends**
+
+
+```{r content_over_time_plot, echo=FALSE, warning=FALSE, message=FALSE}
+# Count content by date added
+content_over_time <- netflix_data %>%
+  filter(!is.na(date_added)) %>%
+  mutate(date_added = as.Date(date_added, format = "%m/%d/%Y")) %>%
+  count(date_added)
+
+ggplot(content_over_time, aes(x = date_added, y = n)) +
+  geom_line(color = "darkgreen", size = 1) +
+  labs(
+    title = "Content Added Over Time",
+    subtitle = "The graph shows a sharp increase in content addition post-2015, peaking around.",
+    x = "Date Added",
+    y = "Number of Titles"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 10, face = "italic", hjust = 0.5, margin = margin(t = 5, b = 10)),
+    axis.text.y = element_text(size = 10),
+    axis.text.x = element_text(size = 10),
+    plot.margin = margin(20, 20, 30, 20)
+  )
+
+```
+
+
+```{r heatmap_release_year_rating, echo=FALSE, warning=FALSE, message=FALSE}
+# Group by release year and rating
+heatmap_data <- netflix_data %>%
+  filter(!is.na(release_year), !is.na(rating)) %>%
+  group_by(release_year, rating) %>%
+  summarise(count = n(), .groups = "drop")
+
+ggplot(heatmap_data, aes(x = release_year, y = rating, fill = count)) +
+  geom_tile() +
+  labs(
+    title = "Heat Map of Release Year vs. Rating",
+    subtitle = "The concentration of TV-MA and TV-14 ratings after 2000 indicates Netflix's growing adult-oriented content.",
+    x = "Release Year",
+    y = "Rating",
+    fill = "Count"
+  ) +
+  theme_minimal() +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  theme(
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 10, face = "italic", hjust = 0.5, margin = margin(t = 5, b = 10)),
+    axis.text.y = element_text(size = 9),
+    axis.text.x = element_text(size = 9),
+    plot.margin = margin(20, 20, 30, 20)
+  )
+
+
+```
+
+
+
+```{r scatter_plot_release_year_duration, echo=FALSE, warning=FALSE, message=FALSE}
+# Scatter Plot: Release Year vs Duration Value with Regression Lines
+scatter_plot_data <- netflix_data %>%
+  filter(!is.na(duration_value) & release_year >= 1920)  
+
+ggplot(scatter_plot_data, aes(x = release_year, y = duration_value, color = type)) +
+  geom_point(alpha = 0.5) +  # Scatter points
+  geom_smooth(method = "lm", se = FALSE, aes(linetype = type), size = 1) +  # Add regression lines
+  labs(
+    title = "Scatter Plot of Release Year vs. Duration (with Regression Lines)",
+    subtitle = "The plot reveals that the duration of movies has stayed relatively consistent, while TV shows have shorter average durations.",
+    x = "Release Year",
+    y = "Duration (Minutes)",
+    color = "Content Type",
+    linetype = "Content Type" 
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 7, face = "italic", hjust = 0.5, margin = margin(t = 5, b = 10)),
+    axis.text.y = element_text(size = 9),
+    axis.text.x = element_text(size = 9),
+    plot.margin = margin(20, 20, 30, 20)
+  )
+
+
+```
+
+
+## <span style="color: rgb(221,72,20);">Tables</span>
+
+
+```{r top_recent_titles_table, echo=FALSE, warning=FALSE, message=FALSE}
+
+# Ensure 'date_added' is in Date format
+netflix_data <- netflix_data %>%
+  mutate(date_added = as.Date(date_added, format = "%m/%d/%Y"))
+
+# Filter and sort data to get the most recently added titles, including genres
+top_recent_titles <- netflix_data %>%
+  filter(!is.na(date_added)) %>%
+  arrange(desc(date_added)) %>% 
+  head(8) %>%
+  select(title, type, country, listed_in, date_added, release_year) 
+
+# Render the table with kableExtra
+top_recent_titles %>%
+  kbl(
+    caption = "Top 10 Most Recent Movies/TV Shows Added (with Genres):\nThis table provides a snapshot of recently added content, highlighting global diversity."
+  ) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+
+
+```
+
+
+```{r content_by_rating_table, echo=FALSE, warning=FALSE, message=FALSE}
+# Count content by rating
+content_by_rating <- netflix_data %>%
+  group_by(rating) %>%
+  summarise(Content_Count = n()) %>%
+  arrange(desc(Content_Count))
+
+# Add a total row summarizing the total count
+library(dplyr)
+content_by_rating <- content_by_rating %>%
+  add_row(rating = "Total", Content_Count = sum(content_by_rating$Content_Count))
+
+# Render the table
+library(kableExtra)
+content_by_rating %>%
+  kbl(
+    caption = "Distribution of Content by Rating (with Total Count): TV-MA and TV-14 ratings dominate Netflix’s library, aligning with their focus on adult and young adult content."
+  ) %>%
+  kable_styling(
+    full_width = TRUE, # To Keep the table and caption spanning the entire width
+    position = "center", 
+    bootstrap_options = c("striped", "hover", "condensed", "responsive")
+  ) %>%
+  column_spec(1, width = "15%") %>% 
+  column_spec(2, width = "15%")     
+```
+
+
+
+## <span style="color: rgb(221,72,20);"> Conclusion</span>
+
+ **Conclusion**
+
+The analysis of the Netflix dataset revealed key trends and patterns. Movies constitute a significant portion of the catalog, while genres like "Dramas" and "International TV Shows" dominate. The United States leads in content production, but there is also a growing presence of diverse content from other countries like India and the UK. Recent years have seen a sharp increase in content additions, particularly in TV-MA and TV-14 rated categories, highlighting Netflix's focus on mature and young adult audiences.
+
+## <span style="color: rgb(221,72,20);"> Recommendations</span>
+
+**Recommendations**
+
+- Expand Regional Content: Increase content from underrepresented countries to attract a more diverse global audience.
+- Broaden Genre Offerings: Invest in underserved genres to appeal to niche audiences and differentiate from competitors.
+- Analyze Viewer Engagement: Use viewer analytics to prioritize content types and ratings with the highest engagement.
+
+
+**References**
+
+<a href="https://www.kaggle.com/datasets/rahulvyasm/netflix-movies-and-tv-shows"style="color:rgb(221,72,20);">Exploring the Depths of Netflix;A Comprehensive Dataset of Movies and TV Shows </a>
+
+
+
+
