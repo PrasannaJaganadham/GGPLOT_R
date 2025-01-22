@@ -27,6 +27,8 @@ Visualizations: Use graphs and charts to present data insights effectively.
 Interactive Report: An HTML-based document for easy sharing and review.
 
 Tools and Libraries Used Programming Language: R
-Key Libraries:  ggplot2: For visualizations
-                dplyr: For data manipulation
-                knitr and rmarkdown: For report generation
+Key Libraries: 
+
+ggplot2: For visualizations
+dplyr: For data manipulation
+knitr and rmarkdown: For report generation
