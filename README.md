@@ -17,14 +17,16 @@ An HTML document generated from the R Markdown file, presenting the results in a
 Objectives
 Analyze the Netflix dataset to identify trends and insights.
 Use R for data preprocessing, statistical analysis, and data visualization.
-Create a shareable report in HTML format for stakeholders.
+Create a shareable report in HTML format.
+
 Key Features
 Data Analysis: Explore key trends in content type, release years, and popularity.
+
 Visualizations: Use graphs and charts to present data insights effectively.
+
 Interactive Report: An HTML-based document for easy sharing and review.
-Tools and Libraries Used
-Programming Language: R
-Key Libraries:
-ggplot2: For visualizations
-dplyr: For data manipulation
-knitr and rmarkdown: For report generation
+
+Tools and Libraries Used Programming Language: R
+Key Libraries:  ggplot2: For visualizations
+                dplyr: For data manipulation
+                knitr and rmarkdown: For report generation
